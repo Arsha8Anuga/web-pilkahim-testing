@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AuditLogAction;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,22 +14,8 @@ return new class extends Migration
 
     public function up(): void
     {
-        $actions = [
-               'LOGIN_SUCCESS',
-               'LOGIN_FAILED',
-               'LOGOUT',
-               'VOTE_CAST',
-               'VOTE_REJECTED',
-               'ELECTION_CREATED',
-               'ELECTION_ACTIVATED',
-               'ELECTION_CLOSED',
-               'ELECTION_DELETED',
-               'CANDIDATE_CREATED',
-               'CANDIDATE_DELETED',
-               'CONFIG_CHANGED'
-            ];
 
-        Schema::create('audit_logs', function (Blueprint $table) use ($actions) {
+        Schema::create('audit_logs', function (Blueprint $table) {
 
             $table->id();
 
@@ -42,7 +29,7 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
-            $table->enum('action', $actions);
+            $table->enum('action', array_column(AuditLogAction::cases(), 'value'));
 
             $table->json('meta')->nullable();
 

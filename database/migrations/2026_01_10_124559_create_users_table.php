@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -23,9 +25,12 @@ return new class extends Migration
                   ->cascadeOnUpdate()
                   ->restrictOnDelete();
             
-            $table->enum('role', ['admin','voter']);
+            $table->enum('role', array_column(UserRole::cases(), 'value'));
+            
             $table->boolean('can_vote')->default('true');
-            $table->enum('status', ['aktif','pasif'])->default('aktif');
+
+            $table->enum('status', array_column(UserStatus::cases(), 'value'))
+                  ->default('aktif');
 
             // $table->rememberToken();
             $table->timestamps();
