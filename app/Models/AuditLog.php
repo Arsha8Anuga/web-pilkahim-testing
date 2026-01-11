@@ -9,7 +9,7 @@ class AuditLog extends Model
 
     protected $table = 'audit_logs';
 
-    protected $guarded = [
+    protected $fillable = [
         'id_user',
         'id_election',
         'action',
