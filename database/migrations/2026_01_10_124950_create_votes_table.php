@@ -15,21 +15,21 @@ return new class extends Migration
 
             $table->id();
 
-            $table->foreignId('election_id')
+            $table->foreignId('id_election')
                 ->constrained()
                 ->restrictOnDelete();
 
-            $table->foreignId('user_id')
+            $table->foreignId('id_user')
                 ->constrained()
                 ->restrictOnDelete();
 
-            $table->foreignId('candidate_id')
+            $table->foreignId('id_candidate')
                 ->constrained()
                 ->restrictOnDelete();
 
             $table->timestamp('created_at')->useCurrent();
 
-            $table->unique(['election_id', 'user_id']);
+            $table->unique(['id_election', 'id_user']);
             $table->index(['created_at']);
         });
     }

@@ -19,12 +19,12 @@ return new class extends Migration
 
             $table->id();
 
-            $table->foreignId('user_id')
+            $table->foreignId('id_user')
                 ->nullable()
                 ->constrained()
                 ->nullOnDelete();
 
-            $table->foreignId('election_id')
+            $table->foreignId('id_election')
                 ->nullable()
                 ->constrained()
                 ->nullOnDelete();

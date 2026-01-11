@@ -26,12 +26,13 @@ return new class extends Migration
                   ->restrictOnDelete();
             
             $table->enum('role', array_column(UserRole::cases(), 'value'));
-            
+
             $table->boolean('can_vote')->default('true');
 
             $table->enum('status', array_column(UserStatus::cases(), 'value'))
                   ->default('aktif');
 
+            $table->softDeletes();
             // $table->rememberToken();
             $table->timestamps();
         });
