@@ -31,7 +31,8 @@ class User extends Authenticatable
         'id_class',
         'role',
         'can_vote',
-        'status'
+        'status',
+        'delete_at'
     ];
 
     /**

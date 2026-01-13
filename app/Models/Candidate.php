@@ -65,21 +65,22 @@ class Candidate extends Model
         return $this->votes()->exists();
     }
 
-
-    public function hasWon(): bool {
-        if (!$this->election || !$this->election->isClosed()) {
+    public function hasWon(): bool
+    {
+        if (!$this->election?->isClosed()) {
             return false;
         }
 
-        $votesCounts = $this->election->candidates()
+        $voteCounts = $this->election->candidates()
             ->withCount('votes')
             ->pluck('votes_count', 'id');
 
-        $maxVotes = $votesCounts->max();
+        $max = $voteCounts->max();
 
-        $topCandidates = $votesCounts->filter(fn($votes) => $votes === $maxVotes);
-
-        return $topCandidates->count() === 1 && $topCandidates->keys()->first() === $this->id;
+        return $max !== null
+            && $voteCounts->filter(fn ($v) => $v === $max)->count() === 1
+            && $voteCounts->get($this->id) === $max;
     }
+
 
 }

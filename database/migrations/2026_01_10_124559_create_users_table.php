@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('password');
 
             $table->foreignId('id_class')
-                  ->constrained('classes', 'id')
+                  ->constrained('classes')
                   ->cascadeOnUpdate()
                   ->restrictOnDelete();
             
