@@ -3,19 +3,24 @@
 namespace App\Livewire\Admin\UserManagement;
 
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Masmerise\Toaster\Toaster;
 
 class Index extends Component
 {
+
+    use WithPagination, AuthorizesRequests;
     
-    use WithPagination;
+    #[Title("User Management")]
 
     public int $paginationIndex = 10;
     public string $currentState = '';
@@ -27,7 +32,7 @@ class Index extends Component
         'delete' => false
     ];
 
-    public $rules = [
+    protected $rules = [
         'create' => [
             'nim' => 'required|string|regex:/^[0-9]{9}$/',
             'name' => 'required|string',
@@ -92,13 +97,11 @@ class Index extends Component
     public function create(){ 
 
         try{
+
+            $this->authorize('create');
             
             $result = $this->validate($this->rules[$this->currentState]);
-
-            DB::transaction(function (){
                 
-            });
-
             $result['password'] = Hash::make($result['password']);
 
             $user = User::create($result);
@@ -116,17 +119,25 @@ class Index extends Component
     }
 
     public function delete(){
+
         try{
 
-            
+            $this->authorize('delete', $this->modalUser);
+
             $this->validate($this->rules[$this->currentState]);
+            
+            DB::transaction(function(){
 
-
-
-            User::findOrFail($this->modalUser->id)->delete();
+                $user = User::whereKey($this->modalUser->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+    
+                $user->delete();
+    
+            });
 
             Toaster::success("User telah berhasil dihapus: {$this->modalUser->name}");
-            
+                
             $this->closeModal($this->currentState);
 
         } catch (ModelNotFoundException $e) {
@@ -135,25 +146,36 @@ class Index extends Component
             Toaster::error("Internal Server Error: {$e->getMessage()}");
         } catch (ValidationException $e) {
             Toaster::error("Validasi gagal: " . $e->validator->errors()->first());
+        } catch (AuthorizationException $e){
+             Toaster::error('Tidak memiliki izin untuk melakukan aksi ini');
         }
     }
 
     public function update() {
         try {
 
+            $this->authorize('update', $this->modalUser);
+
             $result = $this->validate($this->rules[$this->currentState]);
 
-            $user = User::findOrFail($this->modalUser->id);
+            DB::transaction( function () use ($result){
+                
+                if (!empty($result['password'])) {
+                    $result['password'] = Hash::make($result['password']);
+                } else {
+                    unset($result['password']); 
+                }
 
-            if (!empty($result['password'])) {
-                $result['password'] = Hash::make($result['password']);
-            } else {
-                unset($result['password']); 
-            }
-
-            $user->update($result);
-
-            Toaster::success("User {$user->name} berhasil diperbarui");
+                $user = User::whereKey($this->modalUser->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+    
+    
+                $user->update($result);
+    
+            });
+                
+            Toaster::success("User {$this->modalUser->name} berhasil diperbarui");
 
             $this->closeModal($this->currentState);
 
@@ -163,6 +185,8 @@ class Index extends Component
             Toaster::error("Validasi gagal: " . $e->validator->errors()->first());
         } catch (QueryException $e) {
             Toaster::error("Internal Server Error: " . $e->getMessage());
+        }catch (AuthorizationException $e){
+             Toaster::error('Tidak memiliki izin untuk melakukan aksi ini');
         }
     }
 

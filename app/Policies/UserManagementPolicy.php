@@ -15,7 +15,4 @@ class UserManagementPolicy
         return $authUser->isAdmin();
     }
 
-    public function create(User $authUser) {
-        return $authUser->isAdmin();
-    }
 }
