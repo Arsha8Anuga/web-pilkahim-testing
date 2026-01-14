@@ -113,6 +113,8 @@ class Index extends Component
     public function delete(){
         try{
 
+            
+
             $this->validate($this->rules[$this->currentState]);
 
             User::findOrFail($this->modalUser->id)->delete();
