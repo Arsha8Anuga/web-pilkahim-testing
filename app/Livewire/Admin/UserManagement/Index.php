@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\UserManagement;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -94,6 +95,10 @@ class Index extends Component
             
             $result = $this->validate($this->rules[$this->currentState]);
 
+            DB::transaction(function (){
+                
+            });
+
             $result['password'] = Hash::make($result['password']);
 
             $user = User::create($result);
@@ -114,8 +119,9 @@ class Index extends Component
         try{
 
             
-
             $this->validate($this->rules[$this->currentState]);
+
+
 
             User::findOrFail($this->modalUser->id)->delete();
 
