@@ -15,4 +15,13 @@ class UserManagementPolicy
         return $authUser->isAdmin();
     }
 
+    public function restore(User $authUser, User $targetUser): bool {
+        return $authUser->id !== $targetUser->id;
+    }
+
+    public function forceDelete(User $authUser, User $targetUser): bool{
+        return $authUser->id !== $targetUser->id;
+    }
+
+
 }
