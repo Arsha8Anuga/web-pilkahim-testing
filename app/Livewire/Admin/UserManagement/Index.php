@@ -54,8 +54,7 @@ class Index extends Component
     public string $sortDirection = 'desc';
 
 
-    public function openModal(string $type, $id = null)
-    {
+    public function openModal(string $type, $id = null){
         if (in_array($type, ['detail', 'update', 'delete'])) {
             $this->modalUser = User::with('classes')->findOrFail($id);
         }
@@ -68,15 +67,13 @@ class Index extends Component
         $this->modals[$type] = true;
     }
 
-    public function closeModal(string $type)
-    {
+    public function closeModal(string $type){
         $this->modals[$type] = false;
         $this->currentState = '';
         $this->modalUser = null;
     }
 
-    public function create(UserService $service)
-    {
+    public function create(UserService $service){
         try {
             $this->authorize('create');
 
@@ -97,8 +94,7 @@ class Index extends Component
         }
     }
 
-    public function update(UserService $service)
-    {
+    public function update(UserService $service){
         try {
             $this->authorize('update', $this->modalUser);
 
@@ -121,8 +117,7 @@ class Index extends Component
         }
     }
 
-    public function delete(UserService $service)
-    {
+    public function delete(UserService $service){
         try {
             $this->authorize('delete', $this->modalUser);
 
@@ -141,32 +136,28 @@ class Index extends Component
         }
     }
 
-    public function updatePaginationIndex()
-    {
+    public function updatePaginationIndex(){
         $this->resetPage();
     }
 
-    public function updatedSearch()
-    {
+    public function updatedSearch(){
         $this->resetPage();
     }
 
-    public function updatedFilterClass()
-    {
+    public function updatedFilterClass(){
         $this->resetPage();
     }
 
-    public function updatedFilterStatus()
-    {
+    public function updatedFilterStatus(){
         $this->resetPage();
     }
 
-    public function sort(string $field)
-    {
+    public function sort(string $field){
+
         if (! in_array($field, $this->sortable)) {
             return;
         }
-        
+
         if ($this->sortBy === $field) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -177,8 +168,8 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function render()
-    {
+    public function render(){
+
         $users = User::query()
             ->select('id', 'nim', 'name', 'id_class', 'status')
             ->with('classes:id,name')
