@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Admin\UserManagement;
 
+use App\DTO\User\ForceDeleteUserDTO;
+use App\DTO\User\RestoreUserDTO;
 use App\Models\User;
+use App\Service\User\UserService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,10 +22,8 @@ class TrashBin extends Component
     #[Title('User Trash Bin')]
 
     public int $paginationIndex = 10;
-
     public string $currentState = '';
-
-    public $modalUser;
+    public ?User $modalUser = null;
 
     public $modals = [
         'restore' => false,
@@ -32,92 +32,62 @@ class TrashBin extends Component
 
     protected string $paginationTheme = 'tailwind';
 
-    protected $rules = [
-        'restore' => [
-            'id' => 'required|numeric',
-        ],
-        'forceDelete' => [
-            'id' => 'required|numeric',
-        ],
-    ];
-
     public function openModal(string $type, int $id)
     {
-        try{
-
-            $this->modalUser = User::onlyTrashed()
-                                ->findOrFail($id);
-                                
+        try {
+            $this->modalUser = User::onlyTrashed()->findOrFail($id);
+            $this->currentState = $type;
             $this->modals[$type] = true;
 
-        }catch(QueryException $e){
-
-            Toaster::error("Gagal memuat data!!");
-            
-            $this->closeModal($type);
+        } catch (ModelNotFoundException) {
+            Toaster::error('User tidak ditemukan');
         }
     }
 
     public function closeModal(string $type)
     {
         $this->modals[$type] = false;
+        $this->currentState = '';
         $this->modalUser = null;
     }
 
-    public function restore()
+    public function restore(UserService $service)
     {
         try {
             $this->authorize('restore', $this->modalUser);
 
-            $this->validate($this->rules[$this->currentState]);
-
-            DB::transaction(function () {
-                $user = User::onlyTrashed()
-                    ->whereKey($this->modalUser->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $user->restore();
-            });
+            $dto = new RestoreUserDTO($this->modalUser->id);
+            $service->restore($dto);
 
             Toaster::success("User {$this->modalUser->name} berhasil dipulihkan");
-
             $this->closeModal('restore');
 
         } catch (AuthorizationException) {
-            Toaster::error('Tidak memiliki izin untuk restore user');
+            Toaster::error('Tidak memiliki izin');
         } catch (ModelNotFoundException) {
             Toaster::error('User tidak ditemukan');
-        } catch (QueryException $e) {
-            Toaster::error('Internal Server Error: ' . $e->getMessage());
+        } catch (QueryException) {
+            Toaster::error('Internal Server Error');
         }
     }
 
-    public function forceDelete()
+    public function forceDelete(UserService $service)
     {
         try {
             $this->authorize('forceDelete', $this->modalUser);
 
-            $this->validate($this->rules[$this->currentState]);
-
-            DB::transaction(function () {
-                $user = User::onlyTrashed()
-                    ->whereKey($this->modalUser->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $user->forceDelete();
-            });
+            $dto = new ForceDeleteUserDTO($this->modalUser->id);
+            $service->forceDelete($dto);
 
             Toaster::success("User {$this->modalUser->name} dihapus permanen");
             $this->closeModal('forceDelete');
 
         } catch (AuthorizationException) {
-            Toaster::error('Tidak memiliki izin untuk menghapus permanen');
+            Toaster::error('Tidak memiliki izin');
         } catch (ModelNotFoundException) {
             Toaster::error('User tidak ditemukan');
-        } catch (QueryException $e) {
-            Toaster::error('Internal Server Error: ' . $e->getMessage());
+        } catch (QueryException) {
+            Toaster::error('Internal Server Error');
         }
     }
 

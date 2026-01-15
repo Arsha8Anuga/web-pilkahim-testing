@@ -16,7 +16,7 @@ class ForceDeleteUserDTO
 
     public static function from(array $data): self{
         return new self(
-            (int)$data['id']
+            $data['id']
         );
     }
 

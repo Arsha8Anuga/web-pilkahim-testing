@@ -4,6 +4,7 @@ namespace App\DTO\User;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Enum;
 
 class UpdateUserDTO
@@ -30,12 +31,31 @@ class UpdateUserDTO
         ];
     }
 
+    public function toArray(): array {
+       
+        $data = [
+            'nim' => $this->nim,
+            'name' => $this->name,
+            'id_class' => $this->id_class,
+            'role' => $this->role,
+            'status' => $this->status,
+            'can_vote' => $this->can_vote,
+        ];
+
+        if ($this->password !== null) {
+            $data['password'] = Hash::make($this->password);
+        }
+
+        return $data;
+    }
+
+
     public static function from(array $data): self{
         return new self(
             $data['nim'] ?? null,
             $data['name'] ?? null,
             $data['password'] ?? null,
-            (int)$data['id_class'] ?? null,
+            $data['id_class'] ?? null,
             $data['role'] ?? null,
             $data['status'] ?? null,
             $data['can_vote'] ?? null,

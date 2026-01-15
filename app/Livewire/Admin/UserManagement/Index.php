@@ -2,13 +2,15 @@
 
 namespace App\Livewire\Admin\UserManagement;
 
+use App\DTO\User\CreateUserDTO;
+use App\DTO\User\DeleteUserDTO;
+use App\DTO\User\UpdateUserDTO;
 use App\Models\User;
+use App\Service\User\UserService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -17,9 +19,8 @@ use Masmerise\Toaster\Toaster;
 
 class Index extends Component
 {
-
     use WithPagination, AuthorizesRequests;
-    
+
     #[Title("User Management")]
 
     public int $paginationIndex = 10;
@@ -28,180 +29,109 @@ class Index extends Component
     public $modals = [
         'detail' => false,
         'create' => false,
-        'edit' => false,
+        'update' => false,
         'delete' => false
     ];
 
-    protected $rules = [
-        'create' => [
-            'nim' => 'required|string|regex:/^[0-9]{9}$/',
-            'name' => 'required|string',
-            'password' => 'required|string',
-            'id_class' => 'required|numeric|exists:classes,id',
-            'role' => ['required', new Enum(UserRole::class)],
-            'status' => ['required', new Enum(UserStatus::class)],
-            'can_vote' => 'required|boolean',
-        ],
-        'delete' => [
-            'id' => 'required|numeric'
-        ],
-        'update' => [
-            'nim' => 'nullable|string|regex:/^[0-9]{9}$/',
-            'name' => 'nullable|string',
-            'password' => 'nullable|string',
-            'id_class' => 'nullable|numeric|exists:classes,id',
-            'role' => ['nullable', new Enum(UserRole::class)],
-            'status' => ['nullable', new Enum(UserStatus::class)],
-            'can_vote' => 'nullable|boolean',
-        ],
-    ];
-
-    public $modalUser;
+    public ?User $modalUser;
 
     protected string $paginationTheme = 'tailwind';
 
-    public function openModal(string $type, $id = null){
-
-        switch($type){
-            case 'detail' : 
-            case 'edit' : 
-            case 'delete' :
-                $this->modalUser = User::with('classes')
-                                    ->findOrFail($id);
-            break;
+    public function openModal(string $type, $id = null)
+    {
+        if (in_array($type, ['detail', 'update', 'delete'])) {
+            $this->modalUser = User::with('classes')->findOrFail($id);
         }
 
         $this->currentState = $type;
         $this->modals[$type] = true;
-
     }
 
-    public function closeModal(string $type){
-
+    public function closeModal(string $type)
+    {
         $this->modals[$type] = false;
         $this->currentState = '';
-        
-        if ($type === 'create') {
-           return;
-        }
-
-        switch($type){
-            case 'detail' : 
-            case 'edit' : 
-            case 'delete' :
-                $this->modalUser = null;
-            break;
-        }
-
+        $this->modalUser = null;
     }
 
-    public function create(){ 
-
-        try{
-
-            $this->authorize('create');
-            
-            $result = $this->validate($this->rules[$this->currentState]);
-                
-            $result['password'] = Hash::make($result['password']);
-
-            $user = User::create($result);
-
-            Toaster::success("User telah berhasil dibuat : {$user->name} 👏🏼👏🏼👏🏼");
-
-            $this->closeModal($this->currentState);
-            
-        }catch(ValidationException $e){
-            Toaster::error("Validasi gagal : {$e->validator->errors()->first()}");
-        }catch(QueryException $e){
-            Toaster::error("Internal Server Error : {$e->getMessage()}");
-        }
-        
-    }
-
-    public function delete(){
-
-        try{
-
-            $this->authorize('delete', $this->modalUser);
-
-            $this->validate($this->rules[$this->currentState]);
-            
-            DB::transaction(function(){
-
-                $user = User::whereKey($this->modalUser->id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
-    
-                $user->delete();
-    
-            });
-
-            Toaster::success("User telah berhasil dihapus: {$this->modalUser->name}");
-                
-            $this->closeModal($this->currentState);
-
-        } catch (ModelNotFoundException $e) {
-            Toaster::error("Tak dapat menemukan User: {$e->getMessage()}");
-        } catch (QueryException $e) {
-            Toaster::error("Internal Server Error: {$e->getMessage()}");
-        } catch (ValidationException $e) {
-            Toaster::error("Validasi gagal: " . $e->validator->errors()->first());
-        } catch (AuthorizationException $e){
-             Toaster::error('Tidak memiliki izin untuk melakukan aksi ini');
-        }
-    }
-
-    public function update() {
+    public function create(UserService $service)
+    {
         try {
+            $this->authorize('create');
 
+            $data = $this->validate(CreateUserDTO::rules());
+            $dto  = CreateUserDTO::from($data);
+
+            $user = $service->create($dto);
+
+            Toaster::success("User berhasil dibuat: {$user->name}");
+            $this->closeModal('create');
+
+        } catch (ValidationException $e) {
+            Toaster::error($e->validator->errors()->first());
+        } catch (AuthorizationException) {
+            Toaster::error('Tidak memiliki izin');
+        } catch (QueryException) {
+            Toaster::error('Internal Server Error');
+        }
+    }
+
+    public function update(UserService $service)
+    {
+        try {
             $this->authorize('update', $this->modalUser);
 
-            $result = $this->validate($this->rules[$this->currentState]);
+            $data = $this->validate(UpdateUserDTO::rules());
+            $dto  = UpdateUserDTO::from($data);
 
-            DB::transaction( function () use ($result){
-                
-                if (!empty($result['password'])) {
-                    $result['password'] = Hash::make($result['password']);
-                } else {
-                    unset($result['password']); 
-                }
+            $service->update($this->modalUser, $dto);
 
-                $user = User::whereKey($this->modalUser->id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
-    
-    
-                $user->update($result);
-    
-            });
-                
             Toaster::success("User {$this->modalUser->name} berhasil diperbarui");
+            $this->closeModal('edit');
 
-            $this->closeModal($this->currentState);
-
-        } catch (ModelNotFoundException $e) {
-            Toaster::error("Tak dapat menemukan User: {$e->getMessage()}");
         } catch (ValidationException $e) {
-            Toaster::error("Validasi gagal: " . $e->validator->errors()->first());
-        } catch (QueryException $e) {
-            Toaster::error("Internal Server Error: " . $e->getMessage());
-        }catch (AuthorizationException $e){
-             Toaster::error('Tidak memiliki izin untuk melakukan aksi ini');
+            Toaster::error($e->validator->errors()->first());
+        } catch (AuthorizationException) {
+            Toaster::error('Tidak memiliki izin');
+        } catch (ModelNotFoundException) {
+            Toaster::error('User tidak ditemukan');
+        } catch (QueryException) {
+            Toaster::error('Internal Server Error');
         }
     }
 
+    public function delete(UserService $service)
+    {
+        try {
+            $this->authorize('delete', $this->modalUser);
 
-    public function updatePaginationIndex() {
-        $this->resetPage();        
+            $dto = new DeleteUserDTO($this->modalUser->id);
+            $service->delete($dto);
+
+            Toaster::success("User {$this->modalUser->name} berhasil dihapus");
+            $this->closeModal('delete');
+
+        } catch (AuthorizationException) {
+            Toaster::error('Tidak memiliki izin');
+        } catch (ModelNotFoundException) {
+            Toaster::error('User tidak ditemukan');
+        } catch (QueryException) {
+            Toaster::error('Internal Server Error');
+        }
     }
 
-    public function render(){
+    public function updatePaginationIndex()
+    {
+        $this->resetPage();
+    }
+
+    public function render()
+    {
         return view('livewire.admin.user-management.index', [
             'users' => User::select('id', 'nim', 'name', 'id_class', 'status')
-                       ->with('classes:id,name')
-                       ->orderByDesc('created_at')
-                       ->paginate($this->paginationIndex)
+                ->with('classes:id,name')
+                ->orderByDesc('created_at')
+                ->paginate($this->paginationIndex)
         ]);
     }
 }

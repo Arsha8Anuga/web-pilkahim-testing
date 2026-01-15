@@ -4,6 +4,7 @@ namespace App\DTO\User;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use Hash;
 use Illuminate\Validation\Rules\Enum;
 
 class CreateUserDTO
@@ -31,12 +32,24 @@ class CreateUserDTO
         ];
     }
 
+    public function toArray(): array {
+        return [
+            'nim' => $this->nim,
+            'name' => $this->name,
+            'id_class' => $this->id_class,
+            'role' => $this->role,
+            'status' => $this->status,
+            'can_vote' => $this->can_vote,
+            'password' => Hash::make($this->password),
+        ];
+    }
+
     public static function from(array $data): self{
         return new self(
             $data['nim'],
             $data['name'],
             $data['password'],
-            (int)$data['id_class'],
+            $data['id_class'],
             $data['role'],
             $data['status'],
             $data['can_vote'],
