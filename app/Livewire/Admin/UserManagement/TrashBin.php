@@ -43,8 +43,19 @@ class TrashBin extends Component
 
     public function openModal(string $type, int $id)
     {
-        $this->modalUser = User::onlyTrashed()->findOrFail($id);
-        $this->modals[$type] = true;
+        try{
+
+            $this->modalUser = User::onlyTrashed()
+                                ->findOrFail($id);
+                                
+            $this->modals[$type] = true;
+
+        }catch(QueryException $e){
+
+            Toaster::error("Gagal memuat data!!");
+            
+            $this->closeModal($type);
+        }
     }
 
     public function closeModal(string $type)
@@ -69,7 +80,8 @@ class TrashBin extends Component
                 $user->restore();
             });
 
-            Toaster::success("User {$this->modalUser->name} berhasil direstore");
+            Toaster::success("User {$this->modalUser->name} berhasil dipulihkan");
+
             $this->closeModal('restore');
 
         } catch (AuthorizationException) {

@@ -66,7 +66,8 @@ class Index extends Component
             case 'detail' : 
             case 'edit' : 
             case 'delete' :
-                $this->modalUser = User::with('classes')->find($id);
+                $this->modalUser = User::with('classes')
+                                    ->findOrFail($id);
             break;
         }
 
@@ -75,7 +76,7 @@ class Index extends Component
 
     }
 
-    public function closeModal($type){
+    public function closeModal(string $type){
 
         $this->modals[$type] = false;
         $this->currentState = '';
