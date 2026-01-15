@@ -6,6 +6,7 @@ use App\DTO\User\CreateUserDTO;
 use App\DTO\User\DeleteUserDTO;
 use App\DTO\User\UpdateUserDTO;
 use App\Models\User;
+use App\Models\UserClass;
 use App\Service\User\UserService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -33,14 +34,34 @@ class Index extends Component
         'delete' => false
     ];
 
+    protected array $sortable = [
+        'name',
+        'nim',
+        'status',
+        'created_at',
+    ];
+
     public ?User $modalUser;
 
+    public $userClasses = [];
+
     protected string $paginationTheme = 'tailwind';
+
+    public string $search = '';
+    public ?int $filterClass = null;
+    public ?string $filterStatus = null;
+    public string $sortBy = 'created_at';
+    public string $sortDirection = 'desc';
+
 
     public function openModal(string $type, $id = null)
     {
         if (in_array($type, ['detail', 'update', 'delete'])) {
             $this->modalUser = User::with('classes')->findOrFail($id);
+        }
+
+        if (in_array($type, ['update','create'])){
+            $this->userClasses = UserClass::all();
         }
 
         $this->currentState = $type;
@@ -87,7 +108,7 @@ class Index extends Component
             $service->update($this->modalUser, $dto);
 
             Toaster::success("User {$this->modalUser->name} berhasil diperbarui");
-            $this->closeModal('edit');
+            $this->closeModal('update');
 
         } catch (ValidationException $e) {
             Toaster::error($e->validator->errors()->first());
@@ -125,13 +146,64 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterClass()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function sort(string $field)
+    {
+        if (! in_array($field, $this->sortable)) {
+            return;
+        }
+        
+        if ($this->sortBy === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $field;
+            $this->sortDirection = 'asc';
+        }
+
+        $this->resetPage();
+    }
+
     public function render()
     {
+        $users = User::query()
+            ->select('id', 'nim', 'name', 'id_class', 'status')
+            ->with('classes:id,name')
+
+            ->when($this->search, function ($q) {
+                $q->where(function ($qq) {
+                    $qq->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('nim', 'like', "%{$this->search}%");
+                });
+            })
+
+            ->when($this->filterClass, fn ($q) =>
+                $q->where('id_class', $this->filterClass)
+            )
+
+            ->when($this->filterStatus, fn ($q) =>
+                $q->where('status', $this->filterStatus)
+            )
+
+            ->orderBy($this->sortBy, $this->sortDirection)
+            ->paginate($this->paginationIndex);
+
         return view('livewire.admin.user-management.index', [
-            'users' => User::select('id', 'nim', 'name', 'id_class', 'status')
-                ->with('classes:id,name')
-                ->orderByDesc('created_at')
-                ->paginate($this->paginationIndex)
+            'users' => $users,
         ]);
     }
+
 }
