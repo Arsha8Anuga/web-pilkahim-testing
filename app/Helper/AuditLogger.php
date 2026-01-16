@@ -14,7 +14,7 @@ final class AuditLogger
         AuditLogResult $result,
         int $userId,
         array $meta = []
-    ): void {
+    ){
         self::write(
             action: $action,
             result: $result,
@@ -27,7 +27,7 @@ final class AuditLogger
         AuditLogAction $action,
         AuditLogResult $result,
         array $meta = []
-    ): void {
+    ){
         self::write(
             action: $action,
             result: $result,
@@ -41,7 +41,7 @@ final class AuditLogger
         AuditLogResult $result,
         ?int $userId,
         array $meta
-    ): void {
+    ){
         try {
             AuditLog::create([
                 'id_user'   => $userId,

@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Models\UserClass;
+use App\Policies\UserClassPolicy;
 use App\Policies\UserManagementPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -20,8 +22,8 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
-    {
+    public function boot(): void {
         Gate::policy(User::class, UserManagementPolicy::class);
+        Gate::policy(UserClass::class, UserClassPolicy::class);
     }
 }
