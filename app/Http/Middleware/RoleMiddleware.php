@@ -9,42 +9,28 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-    public function handle(Request $request, Closure $next, string ...$roles): Response
-    {
+    public function handle(Request $request, Closure $next, string ...$roles){
+        if (!Auth::check()) {
 
-        if(!Auth::check()){
-            return $this->unauthorizedResponse(
-                $request,
-                'Unauthorized',
-                401
-            );
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            return redirect()->guest(route('auth.login'));
         }
 
-        if(!in_array(Auth::user()->role->value, $roles)){
-            return $this->unauthorizedResponse(
-                $request,
-                'You do not have the required role.',
-                403
-            );
+        if (!in_array(Auth::user()->role->value, $roles)) {
+
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'You do not have the required role.',
+                ], 403);
+            }
+
+            abort(403);
         }
 
         return $next($request);
     }
 
-    protected function unauthorizedResponse(Request $request, string $message, int $status)
-    {
-
-        if ($request->is('api/*')) {
-            return response()->json([
-                'message' => $message,
-            ], $status);
-        }
-
-        abort($status, $message);
-    }
 }

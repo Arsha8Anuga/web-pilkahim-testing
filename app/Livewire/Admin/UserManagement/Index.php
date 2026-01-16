@@ -2,13 +2,18 @@
 
 namespace App\Livewire\Admin\UserManagement;
 
+use App\Concerns\WithAudit;
 use App\DTO\User\CreateUserDTO;
 use App\DTO\User\DeleteUserDTO;
 use App\DTO\User\UpdateUserDTO;
+use App\Enums\AuditLogAction;
+use App\Enums\AuditLogResult;
+use App\Helper\AuditLogger;
 use App\Models\User;
 use App\Models\UserClass;
 use App\Service\User\UserService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -20,14 +25,14 @@ use Masmerise\Toaster\Toaster;
 
 class Index extends Component
 {
-    use WithPagination, AuthorizesRequests;
+    use WithPagination, AuthorizesRequests, WithAudit;
 
     #[Title("User Management")]
 
     public int $paginationIndex = 10;
     public string $currentState = '';
 
-    public $modals = [
+    public array $modals = [
         'detail' => false,
         'create' => false,
         'update' => false,
@@ -43,7 +48,7 @@ class Index extends Component
 
     public ?User $modalUser;
 
-    public $userClasses = [];
+    public Collection $userClasses;
 
     protected string $paginationTheme = 'tailwind';
 
@@ -53,76 +58,115 @@ class Index extends Component
     public string $sortBy = 'created_at';
     public string $sortDirection = 'desc';
 
-
     public function openModal(string $type, $id = null){
-        if (in_array($type, ['detail', 'update', 'delete'])) {
-            $this->modalUser = User::with('classes')->findOrFail($id);
+        try{ 
+            if (in_array($type, ['detail', 'update', 'delete'])) {
+                $this->modalUser = User::with('classes')->findOrFail($id);
+            }
+    
+            if (in_array($type, ['update','create'])){
+                $this->userClasses = UserClass::all();
+            }
+    
+            $this->currentState = $type;
+            $this->modals[$type] = true;
+        }catch (ModelNotFoundException){
+            Toaster::error('User tidak ditemukan');
         }
-
-        if (in_array($type, ['update','create'])){
-            $this->userClasses = UserClass::all();
-        }
-
-        $this->currentState = $type;
-        $this->modals[$type] = true;
     }
 
     public function closeModal(string $type){
         $this->modals[$type] = false;
         $this->currentState = '';
         $this->modalUser = null;
+        $this->userClasses = collect();
+
     }
 
     public function create(UserService $service){
         try {
-            $this->authorize('create');
 
-            $data = $this->validate(CreateUserDTO::rules());
-            $dto  = CreateUserDTO::from($data);
+            $user = $this->withAudit(
+                AuditLogAction::USER_CREATE,
+                function () use ($service) {
 
-            $user = $service->create($dto);
+                    $this->authorize('create');
+
+                    $data = $this->validate(CreateUserDTO::rules());
+                    $dto  = CreateUserDTO::from($data);
+
+                    return $service->create($dto);
+                }
+            );
 
             Toaster::success("User berhasil dibuat: {$user->name}");
             $this->closeModal('create');
 
-        } catch (ValidationException $e) {
-            Toaster::error($e->validator->errors()->first());
+        } catch (ValidationException) {
+            Toaster::error('Validasi gagal');
         } catch (AuthorizationException) {
             Toaster::error('Tidak memiliki izin');
-        } catch (QueryException) {
+        } catch (\Throwable) {
             Toaster::error('Internal Server Error');
         }
     }
 
     public function update(UserService $service){
         try {
-            $this->authorize('update', $this->modalUser);
 
-            $data = $this->validate(UpdateUserDTO::rules());
-            $dto  = UpdateUserDTO::from($data);
+            $this->withAudit(
+                AuditLogAction::USER_UPDATE,
+                function () use ($service) {
 
-            $service->update($this->modalUser, $dto);
+                    if (! $this->modalUser) {
+                        throw new ModelNotFoundException();
+                    }
+
+                    $this->authorize('update', $this->modalUser);
+
+                    $data = $this->validate(UpdateUserDTO::rules());
+                    $dto  = UpdateUserDTO::from($data);
+
+                    $service->update($this->modalUser, $dto);
+                },
+                [
+                    'target_user_id' => $this->modalUser?->id,
+                ]
+            );
 
             Toaster::success("User {$this->modalUser->name} berhasil diperbarui");
             $this->closeModal('update');
 
-        } catch (ValidationException $e) {
-            Toaster::error($e->validator->errors()->first());
+        } catch (ValidationException) {
+            Toaster::error('Validasi gagal');
         } catch (AuthorizationException) {
             Toaster::error('Tidak memiliki izin');
         } catch (ModelNotFoundException) {
             Toaster::error('User tidak ditemukan');
-        } catch (QueryException) {
+        } catch (\Throwable) {
             Toaster::error('Internal Server Error');
         }
     }
 
-    public function delete(UserService $service){
+   public function delete(UserService $service){
         try {
-            $this->authorize('delete', $this->modalUser);
 
-            $dto = new DeleteUserDTO($this->modalUser->id);
-            $service->delete($dto);
+            $this->withAudit(
+                AuditLogAction::USER_DELETE,
+                function () use ($service){
+
+                    if(! $this->modalUser){
+                        throw new ModelNotFoundException();
+                    }
+
+                    $this->authorize('delete', $this->modalUser);
+
+                    $dto = new DeleteUserDTO($this->modalUser->id);
+                    $service->delete($dto);
+                },[
+                    'deleted_user_id' => $this->modalUser->id
+                ]
+            );
 
             Toaster::success("User {$this->modalUser->name} berhasil dihapus");
             $this->closeModal('delete');
@@ -131,7 +175,7 @@ class Index extends Component
             Toaster::error('Tidak memiliki izin');
         } catch (ModelNotFoundException) {
             Toaster::error('User tidak ditemukan');
-        } catch (QueryException) {
+        } catch (\Throwable) {
             Toaster::error('Internal Server Error');
         }
     }
@@ -168,10 +212,13 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function render(){
+    public function mount(){
+        $this->userClasses = collect();
+    }
 
+    public function render(){
         $users = User::query()
-            ->select('id', 'nim', 'name', 'id_class', 'status')
+            ->select('id', 'nim', 'name', 'id_class', 'status', 'created_at')
             ->with('classes:id,name')
 
             ->when($this->search, function ($q) {

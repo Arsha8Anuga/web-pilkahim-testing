@@ -2,6 +2,10 @@
 
 namespace App\Livewire\Auth;
 
+use App\Enums\AuditLogAction;
+use App\Enums\AuditLogResult;
+use App\Helper\AuditLogger;
+use App\Service\Auth\AuthService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -23,23 +27,18 @@ class Login extends Component
         'password' => 'required|string'
     ];
 
-    public function auth(){ 
-        
-        $credentials = $this->validate();
+    public function auth(AuthService $service){
+        $data = $this->validate();
 
-        if(!Auth::attempt($credentials)){
-            
+        if (!$service->login($data['nim'], $data['password'])) {
             Toaster::error('NIM atau Password Salah!!');
             return;
-
         }
 
-        session()->regenerate();
-
         Toaster::success("Semangat, Berjuang, Sukses!! 👏🏼👏🏼👏🏼");
-
-        return redirect()->route("dahboard");
+        return redirect()->intended(route('dahboard'));
     }
+
 
     public function render()
     {

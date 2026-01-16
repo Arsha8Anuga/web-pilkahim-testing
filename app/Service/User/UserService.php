@@ -12,15 +12,13 @@ use Illuminate\Support\Facades\DB;
 
 class UserService
 {
-    public function create(CreateUserDTO $dto): User
-    {
+    public function create(CreateUserDTO $dto): User {
         return DB::transaction(function () use ($dto) {
             return User::create($dto->toArray());
         });
     }
 
-    public function update(User $user, UpdateUserDTO $dto): User
-    {
+    public function update(User $user, UpdateUserDTO $dto): User{
         return DB::transaction(function () use ($user, $dto) {
             $lockedUser = $this->lockUser($user->id);
 
@@ -30,8 +28,7 @@ class UserService
         });
     }
 
-    public function delete(DeleteUserDTO $dto): User
-    {
+    public function delete(DeleteUserDTO $dto): User {
         return DB::transaction(function () use ($dto) {
             $user = $this->lockUser($dto->id);
 
@@ -41,8 +38,7 @@ class UserService
         });
     }
 
-    public function forceDelete(ForceDeleteUserDTO $dto): User
-    {
+    public function forceDelete(ForceDeleteUserDTO $dto): User {
         return DB::transaction(function () use ($dto) {
             $user = $this->lockUser($dto->id, true);
 
@@ -52,8 +48,7 @@ class UserService
         });
     }
 
-    public function restore(RestoreUserDTO $dto): User
-    {
+    public function restore(RestoreUserDTO $dto): User {
         return DB::transaction(function () use ($dto) {
             $user = $this->lockUser($dto->id, true);
 
@@ -63,8 +58,7 @@ class UserService
         });
     }
 
-    private function lockUser(int $id, bool $onlyTrashed = false): User
-    {
+    private function lockUser(int $id, bool $onlyTrashed = false): User {
         $query = $onlyTrashed
             ? User::onlyTrashed()
             : User::query();
